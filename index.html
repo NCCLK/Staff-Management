@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NCC Staff Management Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#eef1f4;--panel:#fff;--ink:#14213d;--mute:#5d6b82;--line:#d9dfe7;--a:#1b998b;--b:#f2a33a;--c:#e4572e;--d:#3d5a99;--e:#8e6bbf;--ok:#1b998b}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1624;--panel:#18223a;--ink:#e8edf6;--mute:#93a1ba;--line:#2a3654;--d:#7ea0e6;--e:#b496e6}}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 "Source Sans 3",system-ui,sans-serif}
+h1,h2,h3,.kv{font-family:"Bricolage Grotesque",system-ui,sans-serif;margin:0}
+.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 22px;background:var(--ink);color:#fff}
+.top h1{font-size:22px;font-weight:700}.top small{opacity:.75}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 12px;border-radius:8px;font:inherit;cursor:pointer}
+.btn:hover{border-color:var(--a)}.btn:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--b);outline-offset:2px}
+.top .btn{background:transparent;color:#fff;border-color:#ffffff55}
+.shell{display:grid;grid-template-columns:250px 1fr;gap:18px;padding:18px 22px;max-width:1500px;margin:auto}
+aside{position:sticky;top:12px;align-self:start;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:12px}
+aside label{display:grid;gap:4px;font-weight:600;font-size:13px;color:var(--mute)}
+select,input{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{font-size:12px;padding:2px 8px;border-radius:99px;background:var(--bg);border:1px solid var(--line)}
+nav{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+nav button{padding:8px 14px;border-radius:99px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:600 14px inherit;font-family:inherit;cursor:pointer}
+nav button[aria-selected=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--a);border-radius:10px;padding:10px 14px}
+.kpi:nth-child(2n){border-left-color:var(--b)}.kpi:nth-child(3n){border-left-color:var(--d)}
+.kpi span{font-size:12.5px;color:var(--mute)}.kv{font-size:26px;font-weight:700;line-height:1.2}.kpi small{color:var(--mute)}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;grid-column:span 6;min-width:0}
+.card.w{grid-column:span 12}.card.t{grid-column:span 4}
+.card h3{font-size:16px;margin-bottom:2px}.card p.s{margin:0 0 8px;color:var(--mute);font-size:13px}
+.cv{position:relative;height:260px}
+ul.ins{margin:0;padding-left:18px}ul.ins li{margin:5px 0}
+.tw{overflow:auto;max-height:480px}table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:6px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:var(--panel);cursor:pointer;color:var(--mute)}tbody tr:hover{background:var(--bg)}
+td.n,th.n{text-align:right}.pill{padding:1px 8px;border-radius:99px;font-size:12px;color:#fff}
+.hm td{text-align:center;min-width:54px;font-size:11px;color:#fff;border:2px solid var(--panel)}
+.empty{padding:30px;text-align:center;color:var(--mute)}.warn{background:#f2a33a22;border:1px solid var(--b);padding:8px 12px;border-radius:8px;margin-bottom:12px;font-size:13.5px}
+.pane{display:none}.pane.on{display:block}
+@media(max-width:900px){.shell{grid-template-columns:1fr;padding:12px}aside{position:static}.card,.card.t{grid-column:span 12}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div><h1>NCC Staff Management</h1><small id="status">Loading from Google Sheets…</small></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn" id="refresh">Refresh data</button>
+    <label class="btn" style="margin:0">Load Excel file<input type="file" id="file" accept=".xlsx,.xls" hidden></label>
+  </div>
+</header>
+<div class="shell">
+<aside aria-label="Filters">
+  <h2 style="font-size:17px">Filters</h2>
+  <label>From month<select id="fFrom"></select></label>
+  <label>To month<select id="fTo"></select></label>
+  <label>Role<select id="fRole"></select></label>
+  <label>Staff member<select id="fPid"></select></label>
+  <label>Performance stage<select id="fStage"></select></label>
+  <label>Work location<select id="fLoc"></select></label>
+  <label>Late start after<input type="time" id="fLate" value="09:00"></label>
+  <button class="btn" id="reset">Reset filters</button>
+  <div class="chips" id="active"></div>
+</aside>
+<main>
+  <nav role="tablist" id="tabs"></nav>
+  <div id="warn"></div>
+  <section class="pane" id="p-overview"></section>
+  <section class="pane" id="p-pay"></section>
+  <section class="pane" id="p-att"></section>
+  <section class="pane" id="p-pen"></section>
+  <section class="pane" id="p-fb"></section>
+  <section class="pane" id="p-staff"></section>
+</main>
+</div>
+<script>
+/* ===== CONFIG ===== */
+const SHEET_ID='1y2MESil6rY2hQ8kt60Bjroezw3GrmSEkyKc4nOZivjQ';
+const TABS={pay:'Payment Summery',att:'Attendance & Leave',pen:'Penalty Points',fb:'Feedback & Evaluation'};
+const MON=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+const STAGE_COL={ACHIEVING:'#1b998b',STABLE:'#3d5a99',DEPENDING:'#f2a33a',FAIL:'#e4572e'};
+const $=id=>document.getElementById(id);
+let D={pay:[],att:[],pen:[],fb:[]},F={},charts={},tab='overview',sortKey='earn',sortDir=-1,q='';
+const fmt=v=>Math.round(v).toLocaleString('en-US'),pct=v=>(v*100).toFixed(0)+'%',r1=v=>(Math.round(v*10)/10);
+const sum=a=>a.reduce((x,y)=>x+y,0),avg=a=>a.length?sum(a)/a.length:0;
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+/* ===== PARSING ===== */
+function csv(t){const rows=[];let r=[],c='',i=0,qt=false;for(;i<t.length;i++){const ch=t[i];
+ if(qt){if(ch=='"'){if(t[i+1]=='"'){c+='"';i++}else qt=false}else c+=ch}
+ else if(ch=='"')qt=true;else if(ch==','){r.push(c);c=''}else if(ch=='\n'){r.push(c);rows.push(r);r=[];c=''}else if(ch!='\r')c+=ch}
+ if(c||r.length){r.push(c);rows.push(r)}return rows}
+const num=v=>{if(v==null||v==='')return 0;const x=parseFloat(String(v).replace(/[,%\sRs₨]/g,''));return isNaN(x)?0:x};
+const kpiV=v=>{const x=num(v);return String(v).includes('%')||x>1.5?x/100:x};
+function pdate(s){if(s instanceof Date)return s;s=String(s||'').trim();if(!s)return null;let m;
+ if(m=s.match(/^(\d{4})-(\d{2})-(\d{2})/))return new Date(+m[1],m[2]-1,+m[3]);
+ if(m=s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/)){let a=+m[1],b=+m[2];return a>12?new Date(+m[3],b-1,a):new Date(+m[3],a-1,b)}
+ const d=new Date(s);return isNaN(d)?null:new Date(d.getFullYear(),d.getMonth(),d.getDate())}
+function pmin(s){if(typeof s=='number')return Math.round(s*1440);const m=String(s||'').match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/i);if(!m)return null;let h=+m[1];if(m[3]){h%=12;if(/pm/i.test(m[3]))h+=12}return h*60+ +m[2]}
+const mIdx=s=>{const m=String(s||'').trim().match(/^([A-Za-z]{3})[a-z]*[-\s'](\d{2,4})$/);if(!m)return null;const k=MON.indexOf(m[1].toLowerCase());if(k<0)return null;let y=+m[2];if(y<100)y+=2000;return y*12+k};
+const mLabel=i=>MON[i%12][0].toUpperCase()+MON[i%12].slice(1)+' '+String(Math.floor(i/12)).slice(2);
+const dIdx=d=>d.getFullYear()*12+d.getMonth();
+const hdr=(rows,key)=>{const i=rows.findIndex(r=>String(r[0]).trim().toUpperCase()==key);return i<0?0:i+1};
+
+function normalize(raw){
+ const pay=[];raw.pay.slice(hdr(raw.pay,'MONTH')).forEach(r=>{const mi=mIdx(r[1]);if(mi==null||!r[3]||!r[4])return;
+  const o={mi,name:r[3].trim(),pid:r[4].trim(),role:(r[5]||'').trim(),kpi:kpiV(r[10]),salary:num(r[13]),tp:num(r[27]),com:num(r[29]),inc:num(r[30]),bon:num(r[31]),earn:num(r[32]),stage:(r[39]||'').trim().toUpperCase(),nopay:num(r[6])};
+  if(o.earn>0||o.tp>0||o.salary>0)pay.push(o)});
+ const att=[];let bad=0;raw.att.slice(hdr(raw.att,'TIMESTAMP')).forEach(r=>{const st=(r[2]||'').trim();if(!r[1])return;
+  const d=pdate(st=='Work'?r[3]:st=='Short Leave'?r[8]:r[12])||pdate(r[0]);if(!d)return;if(d.getFullYear()<2025||d>new Date(Date.now()+864e5*2)){bad++;return}
+  att.push({pid:r[1].trim(),st,d,mi:dIdx(d),act:(r[4]||'').trim(),t:pmin(r[5]),loc:(r[6]||'').trim(),type:(r[11]||'').trim(),dur:(r[16]||'').trim(),ms:(r[17]||'').trim().toUpperCase(),s1:pmin(r[9]),s2:pmin(r[10])})});
+ const pen=[];raw.pen.slice(hdr(raw.pen,'TIMESTAMP')).forEach(r=>{const d=pdate(r[3])||pdate(r[0]);if(!d||!r[2])return;
+  pen.push({d,mi:dIdx(d),pid:r[2].trim().replace(/^BC/i,''),by:r[1],cat:(r[4]||'').trim(),rule:(r[5]||'').trim(),pp:num(r[7])||1,st:(r[8]||'').trim().toUpperCase(),act:(r[11]||'').trim().toUpperCase()||'NO ACTION'})});
+ const fb=[];raw.fb.slice(hdr(raw.fb,'TIMESTAMP')).forEach(r=>{const d=pdate(r[0]);const sc=r.slice(3,13).map(num);if(!d||!r[2]||!sc.some(x=>x))return;
+  const m=r[2].match(/^BC([A-Z]+)\s*-\s*(.*)$/);fb.push({d,mi:dIdx(d),pid:m?m[1]:null,label:m?m[2]:r[2].replace(/^Prospect\s*-\s*/i,'')+' (prospect)',role:(r[1]||'').trim(),sc,avg:avg(sc.filter(x=>x))})});
+ return{pay,att,pen,fb,bad,qs:(raw.fb[0]||[]).slice(3,13).map(s=>s.replace(/^\d+\.\s*/,'').trim())}}
+
+/* ===== LOADING ===== */
+async function fetchTab(n){const u=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&headers=0&sheet=${encodeURIComponent(n)}`;
+ const r=await fetch(u);if(!r.ok)throw new Error(n+': HTTP '+r.status);return csv(await r.text())}
+async function load(){$('status').textContent='Loading from Google Sheets…';
+ try{const ks=Object.keys(TABS),res=await Promise.all(ks.map(k=>fetchTab(TABS[k])));const raw={};ks.forEach((k,i)=>raw[k]=res[i]);
+  init(normalize(raw),'Live from Google Sheets');}
+ catch(e){$('status').textContent='Could not reach Google Sheets';
+  $('warn').innerHTML='<div class="warn"><b>Live data unavailable.</b> Make sure the sheet is shared as “Anyone with the link – Viewer”, then press Refresh. You can also load the downloaded Excel file with the button at top right. ('+e.message+')</div>'}}
+$('file').onchange=async e=>{const f=e.target.files[0];if(!f)return;const wb=XLSX.read(await f.arrayBuffer(),{cellDates:true});const raw={};
+ for(const k in TABS){const ws=wb.Sheets[TABS[k]];raw[k]=ws?XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:'yyyy-mm-dd hh:mm',defval:''}):[]}
+ init(normalize(raw),'Loaded from file '+f.name)};
+$('refresh').onclick=load;
+
+/* ===== FILTERS ===== */
+function init(d,src){D=d;const mset=[...new Set([...d.pay.map(x=>x.mi),...d.att.map(x=>x.mi)])].sort((a,b)=>a-b);D.months=mset;
+ const opt=(el,items,all)=>{el.innerHTML=(all?`<option value="">${all}</option>`:'')+items.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')};
+ opt($('fFrom'),mset.map(m=>[m,mLabel(m)]));opt($('fTo'),mset.map(m=>[m,mLabel(m)]));
+ opt($('fRole'),[...new Set(d.pay.map(x=>x.role))].filter(Boolean).sort().map(x=>[x,x]),'All roles');
+ const people={};d.pay.forEach(x=>people[x.pid]=x.name);D.names=people;
+ opt($('fPid'),Object.entries(people).sort((a,b)=>a[1].localeCompare(b[1])).map(([p,n])=>[p,n+' ('+p+')']),'Everyone');
+ opt($('fStage'),Object.keys(STAGE_COL).map(x=>[x,x[0]+x.slice(1).toLowerCase()]),'All stages');
+ opt($('fLoc'),[...new Set(d.att.map(x=>x.loc))].filter(Boolean).sort().map(x=>[x,x]),'All locations');
+ resetF();$('status').textContent=src+' · updated '+new Date().toLocaleTimeString()+' · '+d.pay.length+' payroll rows, '+d.att.length+' attendance records';
+ $('warn').innerHTML=d.bad?`<div class="warn">${d.bad} attendance record(s) had an impossible date (e.g. year before 2025) and were ignored. Please check the sheet.</div>`:'';render()}
+function resetF(){const m=D.months;$('fFrom').value=m[Math.max(0,m.length-6)];$('fTo').value=m[m.length-1];['fRole','fPid','fStage','fLoc'].forEach(i=>$(i).value='');$('fLate').value='09:00';readF()}
+function readF(){F={from:+$('fFrom').value,to:+$('fTo').value,role:$('fRole').value,pid:$('fPid').value,stage:$('fStage').value,loc:$('fLoc').value,late:pmin($('fLate').value)||540};if(F.from>F.to)[F.from,F.to]=[F.to,F.from]}
+['fFrom','fTo','fRole','fPid','fStage','fLoc','fLate'].forEach(i=>$(i).addEventListener('change',()=>{readF();render()}));
+$('reset').onclick=()=>{resetF();render()};
+
+function view(){const inR=m=>m>=F.from&&m<=F.to;
+ const okP=x=>(!F.role||x.role===F.role)&&(!F.pid||x.pid===F.pid)&&(!F.stage||x.stage===F.stage);
+ const pay=D.pay.filter(x=>inR(x.mi)&&okP(x));
+ let ids=new Set(pay.map(x=>x.pid));
+ if(!F.stage&&!ids.size)ids=new Set(D.pay.filter(x=>(!F.role||x.role===F.role)&&(!F.pid||x.pid===F.pid)).map(x=>x.pid));
+ const narrowed=F.role||F.pid||F.stage;
+ const att=D.att.filter(x=>inR(x.mi)&&ids.has(x.pid)&&(!F.loc||x.st!='Work'||x.loc===F.loc));
+ const pen=D.pen.filter(x=>inR(x.mi)&&ids.has(x.pid));
+ const fb=D.fb.filter(x=>inR(x.mi)&&(x.pid?ids.has(x.pid):!narrowed));
+ return{pay,att,pen,fb,ids}}
+
+/* ===== CHART HELPERS ===== */
+function chart(id,type,data,opts={}){if(charts[id])charts[id].destroy();const el=$(id);if(!el)return;const ink=css('--mute'),line=css('--line');
+ charts[id]=new Chart(el,{type,data,options:Object.assign({responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:ink,boxWidth:12}}},
+ scales:['doughnut','pie','radar'].includes(type)?{}:{x:{ticks:{color:ink},grid:{display:false}},y:{ticks:{color:ink},grid:{color:line}}}},opts)})}
+const PAL=()=>[css('--a'),css('--b'),css('--d'),css('--c'),css('--e'),'#6c8e3e','#c75c9a','#4aa3c7','#8c7a5b','#999'];
+const card=(t,s,id,cls='')=>`<div class="card ${cls}"><h3>${t}</h3><p class="s">${s}</p><div class="cv"><canvas id="${id}"></canvas></div></div>`;
+const kpi=(l,v,s='')=>`<div class="kpi"><span>${l}</span><div class="kv">${v}</div><small>${s}</small></div>`;
+const empty=m=>`<div class="card w"><div class="empty">${m||'No data for the selected filters. Try widening the month range or resetting filters.'}</div></div>`;
+function table(cols,rows,id){return `<div class="tw"><table id="${id}"><thead><tr>${cols.map(c=>`<th class="${c.n?'n':''}" data-k="${c.k}">${c.l}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr data-pid="${r.pid||''}">${cols.map(c=>`<td class="${c.n?'n':''}">${c.f?c.f(r[c.k],r):r[c.k]??''}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
+const stagePill=s=>s?`<span class="pill" style="background:${STAGE_COL[s]||'#888'}">${s.toLowerCase()}</span>`:'';
+const by=(a,f)=>{const m={};a.forEach(x=>(m[f(x)]??=[]).push(x));return m};
+
+/* ===== ANALYTICS ===== */
+function attStats(att){const wk=att.filter(x=>x.st=='Work'),days=by(wk,x=>x.pid+'|'+(+x.d)),per={};
+ Object.values(days).forEach(g=>{const p=g[0].pid,s=g.find(x=>x.act=='Start'),f=g.find(x=>x.act=='Finish');const o=per[p]??={days:0,late:0,home:0,hrs:[],start:[]};
+  o.days++;if(s){o.start.push(s.t);if(s.t>F.late)o.late++;if(/home/i.test(s.loc))o.home++}
+  if(s&&f&&f.t>s.t&&f.t-s.t<1000)o.hrs.push((f.t-s.t)/60)});
+ const lv=att.filter(x=>x.st=='Day Off & Leave'&&x.ms=='APPROVED');lv.forEach(x=>{const o=per[x.pid]??={days:0,late:0,home:0,hrs:[],start:[]};o.leave=(o.leave||0)+(/half/i.test(x.dur)?.5:1)});
+ att.filter(x=>x.st=='Short Leave').forEach(x=>{const o=per[x.pid]??={days:0,late:0,home:0,hrs:[],start:[]};o.short=(o.short||0)+1});return per}
+
+/* ===== RENDER ===== */
+function render(){if(!D.pay.length&&!D.att.length)return;const V=view();
+ $('active').innerHTML=[F.role,F.pid&&D.names[F.pid],F.stage,F.loc].filter(Boolean).map(x=>`<span class="chip">${x}</span>`).join('')||'<span class="chip">All staff</span>';
+ const T=[['overview','Overview'],['pay','Payroll & performance'],['att','Attendance & leave'],['pen','Conduct'],['fb','Feedback'],['staff','Staff scorecard']];
+ $('tabs').innerHTML=T.map(([k,l])=>`<button role="tab" aria-selected="${k==tab}" data-t="${k}">${l}</button>`).join('');
+ $('tabs').onclick=e=>{const t=e.target.dataset.t;if(t){tab=t;render()}};
+ document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id=='p-'+tab));
+ ({overview:rOverview,pay:rPay,att:rAtt,pen:rPen,fb:rFb,staff:rStaff})[tab](V)}
+
+function rOverview(V){const P=V.pay,A=attStats(V.att),months=[...new Set(P.map(x=>x.mi))].sort((a,b)=>a-b);
+ const people=by(P,x=>x.pid),last=months[months.length-1],cur=P.filter(x=>x.mi==last);
+ const tot=sum(P.map(x=>x.earn)),totTp=sum(P.map(x=>x.tp)),daysW=sum(Object.values(A).map(x=>x.days));
+ const pn=V.pen.length,fa=avg(V.fb.map(x=>x.avg));
+ // insights
+ const ins=[];if(P.length){const rank=Object.entries(people).map(([p,r])=>({p,n:r[0].name,tp:sum(r.map(x=>x.tp)),k:avg(r.map(x=>x.kpi))})).sort((a,b)=>b.tp-a.tp);
+  ins.push(`<b>${rank[0].n}</b> leads on target points (${fmt(rank[0].tp)} TP over the period).`);
+  const fails=cur.filter(x=>x.stage=='FAIL');if(fails.length)ins.push(`In ${mLabel(last)}, <b>${fails.length}</b> staff are in the <b>Fail</b> stage: ${fails.map(x=>x.name.split(' ')[0]).join(', ')}.`);
+  if(months.length>1){const pm=months[months.length-2],a=sum(P.filter(x=>x.mi==pm).map(x=>x.earn)),b=sum(cur.map(x=>x.earn));if(a)ins.push(`Payroll cost in ${mLabel(last)} is <b>${fmt(b)}</b>, ${b>=a?'up':'down'} <b>${Math.abs((b-a)/a*100).toFixed(1)}%</b> versus ${mLabel(pm)}.`)}
+  const topPen=Object.entries(by(V.pen,x=>x.pid)).sort((a,b)=>b[1].length-a[1].length)[0];if(topPen)ins.push(`Most penalty records: <b>${D.names[topPen[0]]||topPen[0]}</b> (${topPen[1].length}).`);
+  const lateTop=Object.entries(A).filter(([,o])=>o.days>=5).sort((a,b)=>b[1].late/b[1].days-a[1].late/a[1].days)[0];if(lateTop&&lateTop[1].late)ins.push(`Highest late-start rate: <b>${D.names[lateTop[0]]||lateTop[0]}</b> (${pct(lateTop[1].late/lateTop[1].days)} of days after ${$('fLate').value}).`)}
+ $('p-overview').innerHTML=!P.length&&!V.att.length?empty():`<div class="kpis">${kpi('Staff on payroll',Object.keys(people).length,mLabel(F.from)+' – '+mLabel(F.to))}${kpi('Total payroll cost',fmt(tot),'LKR, salary + commission + incentive + bonus')}${kpi('Avg KPI',pct(avg(P.map(x=>x.kpi))),'across staff-months')}${kpi('Target points',fmt(totTp),'total TP earned')}${kpi('Days worked',fmt(daysW),'start-of-day logs')}${kpi('Penalty records',pn,fmt(sum(V.pen.map(x=>x.pp)))+' penalty points')}${kpi('Feedback score',fb(fa),V.fb.length+' responses')}</div>
+ <div class="grid"><div class="card w"><h3>What stands out</h3><p class="s">Generated from the filtered data</p><ul class="ins">${ins.map(i=>`<li>${i}</li>`).join('')||'<li>No payroll data in this range.</li>'}</ul></div>
+ ${card('Payroll cost by month','Salary, commission, incentive and bonus','c1')}${card('KPI and target points','Average KPI (line) vs total TP (bars)','c2')}
+ ${card('Performance stages','Staff-months by stage','c3','t')}${card('Cost by role','Share of total payroll','c4','t')}${card('Top 10 by target points','Over selected months','c5','t')}
+ <div class="card w"><h3>Stage heatmap</h3><p class="s">Each cell is one staff member in one month. Click a name to filter.</p>${heat(P,months)}</div></div>`;
+ if(!P.length)return;const pal=PAL();
+ chart('c1','bar',{labels:months.map(mLabel),datasets:[['Salary','salary',0],['Commission','com',1],['Incentive','inc',2],['Bonus','bon',4]].map(([l,k,c])=>({label:l,data:months.map(m=>sum(P.filter(x=>x.mi==m).map(x=>x[k]))),backgroundColor:pal[c]}))},{scales:{x:{stacked:true,ticks:{color:css('--mute')}},y:{stacked:true,ticks:{color:css('--mute'),callback:v=>v/1000+'k'},grid:{color:css('--line')}}}});
+ chart('c2','bar',{labels:months.map(mLabel),datasets:[{type:'line',label:'Avg KPI %',yAxisID:'y1',data:months.map(m=>avg(P.filter(x=>x.mi==m).map(x=>x.kpi))*100),borderColor:pal[1],backgroundColor:pal[1],tension:.3},{label:'Total TP',data:months.map(m=>sum(P.filter(x=>x.mi==m).map(x=>x.tp))),backgroundColor:pal[0]}]},{scales:{x:{ticks:{color:css('--mute')}},y:{ticks:{color:css('--mute')},grid:{color:css('--line')}},y1:{position:'right',min:0,max:100,grid:{display:false},ticks:{color:css('--mute'),callback:v=>v+'%'}}}});
+ const st=Object.keys(STAGE_COL);chart('c3','doughnut',{labels:st,datasets:[{data:st.map(s=>P.filter(x=>x.stage==s).length),backgroundColor:st.map(s=>STAGE_COL[s])}]});
+ const rl=by(P,x=>x.role||'—');chart('c4','doughnut',{labels:Object.keys(rl),datasets:[{data:Object.values(rl).map(r=>sum(r.map(x=>x.earn))),backgroundColor:pal}]});
+ const tp=Object.values(people).map(r=>({n:r[0].name,v:sum(r.map(x=>x.tp))})).sort((a,b)=>b.v-a.v).slice(0,10);
+ chart('c5','bar',{labels:tp.map(x=>x.n.split(' ')[0]),datasets:[{label:'TP',data:tp.map(x=>x.v),backgroundColor:pal[2]}]},{indexAxis:'y',plugins:{legend:{display:false}}});
+ document.querySelectorAll('.pick').forEach(el=>el.onclick=()=>{$('fPid').value=el.dataset.p;readF();render()})}
+const fb=v=>v?v.toFixed(2)+' / 5':'–';
+function heat(P,months){const pp=by(P,x=>x.pid);if(!P.length)return'';
+ return `<div class="tw"><table class="hm"><thead><tr><th>Staff</th>${months.map(m=>`<th style="cursor:default">${mLabel(m)}</th>`).join('')}</tr></thead><tbody>${Object.entries(pp).map(([p,r])=>`<tr><td style="text-align:left;color:var(--ink);background:none"><a class="pick" data-p="${p}" style="cursor:pointer;text-decoration:underline">${r[0].name}</a></td>${months.map(m=>{const x=r.find(y=>y.mi==m);return `<td style="background:${x?STAGE_COL[x.stage]||'#8a94a6':'transparent'}" title="${x?x.stage+' · KPI '+pct(x.kpi)+' · TP '+fmt(x.tp):''}">${x?(x.stage||'—').slice(0,4):''}</td>`}).join('')}</tr>`).join('')}</tbody></table></div>`}
+
+function rPay(V){const P=V.pay;if(!P.length){$('p-pay').innerHTML=empty();return}
+ const rows=Object.entries(by(P,x=>x.pid)).map(([p,r])=>({pid:p,name:r[0].name,role:r[r.length-1].role,months:r.length,salary:sum(r.map(x=>x.salary)),com:sum(r.map(x=>x.com)),inc:sum(r.map(x=>x.inc)),earn:sum(r.map(x=>x.earn)),tp:sum(r.map(x=>x.tp)),kpi:avg(r.map(x=>x.kpi)),stage:r.sort((a,b)=>a.mi-b.mi)[r.length-1].stage})).sort((a,b)=>b.earn-a.earn);
+ const mo=[...new Set(P.map(x=>x.mi))].sort((a,b)=>a-b);
+ $('p-pay').innerHTML=`<div class="kpis">${kpi('Total cost',fmt(sum(rows.map(r=>r.earn))))}${kpi('Avg cost per staff-month',fmt(avg(P.map(x=>x.earn))))}${kpi('Commission + incentive',fmt(sum(rows.map(r=>r.com+r.inc))))}${kpi('Avg KPI',pct(avg(P.map(x=>x.kpi))))}${kpi('Cost per target point',fmt(sum(rows.map(r=>r.earn))/(sum(rows.map(r=>r.tp))||1)))}</div>
+ <div class="grid">${card('Earnings per person','Total over selected months','p1')}${card('KPI vs target points','Each dot is a person; top right is best','p2')}${card('Average KPI by role','','p3')}${card('Monthly TP trend (top 5 by TP)','','p4')}
+ <div class="card w"><h3>Payroll detail</h3><p class="s">Click a column to sort, click a row to filter to that person.</p>${table([{k:'name',l:'Name'},{k:'role',l:'Role'},{k:'months',l:'Months',n:1},{k:'salary',l:'Salary',n:1,f:fmt},{k:'com',l:'Commission',n:1,f:fmt},{k:'inc',l:'Incentive',n:1,f:fmt},{k:'earn',l:'Total',n:1,f:fmt},{k:'tp',l:'TP',n:1,f:fmt},{k:'kpi',l:'Avg KPI',n:1,f:pct},{k:'stage',l:'Latest stage',f:stagePill}],rows,'tb')}</div></div>`;
+ const pal=PAL();chart('p1','bar',{labels:rows.slice(0,15).map(r=>r.name.split(' ')[0]),datasets:[{label:'Total',data:rows.slice(0,15).map(r=>r.earn),backgroundColor:pal[0]}]},{indexAxis:'y',plugins:{legend:{display:false}}});
+ chart('p2','scatter',{datasets:[{label:'Staff',data:rows.map(r=>({x:r.kpi*100,y:r.tp,n:r.name})),backgroundColor:pal[1],pointRadius:6}]},{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.raw.n}: KPI ${c.raw.x.toFixed(0)}%, TP ${fmt(c.raw.y)}`}}},scales:{x:{title:{display:true,text:'Avg KPI %',color:css('--mute')},ticks:{color:css('--mute')}},y:{title:{display:true,text:'Total TP',color:css('--mute')},ticks:{color:css('--mute')},grid:{color:css('--line')}}}});
+ const rl=by(P,x=>x.role||'—');chart('p3','bar',{labels:Object.keys(rl),datasets:[{label:'KPI %',data:Object.values(rl).map(r=>avg(r.map(x=>x.kpi))*100),backgroundColor:pal[2]}]},{plugins:{legend:{display:false}}});
+ chart('p4','line',{labels:mo.map(mLabel),datasets:rows.slice().sort((a,b)=>b.tp-a.tp).slice(0,5).map((r,i)=>({label:r.name.split(' ')[0],data:mo.map(m=>sum(P.filter(x=>x.pid==r.pid&&x.mi==m).map(x=>x.tp))),borderColor:pal[i],backgroundColor:pal[i],tension:.3}))});
+ bindTable(rows)}
+
+function rAtt(V){const A=attStats(V.att);const wk=V.att.filter(x=>x.st=='Work');if(!V.att.length){$('p-att').innerHTML=empty('No attendance records for the selected filters.');return}
+ const per=Object.entries(A).map(([p,o])=>({pid:p,name:D.names[p]||p,days:o.days,late:o.days?o.late/o.days:0,home:o.days?o.home/o.days:0,hrs:avg(o.hrs),leave:o.leave||0,short:o.short||0}));
+ const lv=V.att.filter(x=>x.st=='Day Off & Leave'),dayMap=by(wk.filter(x=>x.act=='Start'),x=>+x.d),days=Object.keys(dayMap).sort((a,b)=>a-b);
+ const locs=by(wk.filter(x=>x.act=='Start'),x=>x.loc||'Unknown'),types=by(lv.filter(x=>x.ms!='CANCELLED'),x=>x.type||'Other');
+ const pend=lv.filter(x=>!x.ms).length;
+ $('p-att').innerHTML=`<div class="kpis">${kpi('Work days logged',fmt(sum(per.map(x=>x.days))))}${kpi('Avg work hours / day',r1(avg(per.filter(x=>x.hrs).map(x=>x.hrs)))+' h','start to finish logs')}${kpi('Late starts',pct(sum(per.map(x=>x.late*x.days))/(sum(per.map(x=>x.days))||1)),'after '+$('fLate').value)}${kpi('Working from home',pct(sum(per.map(x=>x.home*x.days))/(sum(per.map(x=>x.days))||1)))}${kpi('Approved leave days',sum(per.map(x=>x.leave)),pend+' awaiting decision, '+lv.filter(x=>x.ms=='CANCELLED').length+' cancelled')}${kpi('Short leaves',sum(per.map(x=>x.short)))}</div>
+ <div class="grid">${card('Staff working each day','Number of people who logged a start','a1','w')}${card('Where people work','Share of work days by location','a2','t')}${card('Leave by type','Approved and pending requests','a3','t')}${card('Late-start rate by person','Starts after '+$('fLate').value,'a4','t')}${card('Average hours per day','Start to finish','a5')}${card('Days worked vs leave taken','','a6')}</div>`;
+ const pal=PAL();chart('a1','bar',{labels:days.map(d=>new Date(+d).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})),datasets:[{label:'Staff',data:days.map(d=>new Set(dayMap[d].map(x=>x.pid)).size),backgroundColor:pal[0]}]},{plugins:{legend:{display:false}}});
+ chart('a2','doughnut',{labels:Object.keys(locs),datasets:[{data:Object.values(locs).map(x=>x.length),backgroundColor:pal}]});
+ chart('a3','bar',{labels:Object.keys(types),datasets:[{label:'Requests',data:Object.values(types).map(x=>x.length),backgroundColor:pal[1]}]},{plugins:{legend:{display:false}}});
+ const s=per.slice().sort((a,b)=>b.late-a.late);chart('a4','bar',{labels:s.map(x=>x.name.split(' ')[0]),datasets:[{label:'Late %',data:s.map(x=>x.late*100),backgroundColor:pal[3]}]},{indexAxis:'y',plugins:{legend:{display:false}}});
+ const h=per.filter(x=>x.hrs).sort((a,b)=>b.hrs-a.hrs);chart('a5','bar',{labels:h.map(x=>x.name.split(' ')[0]),datasets:[{label:'Hours',data:h.map(x=>r1(x.hrs)),backgroundColor:pal[2]}]},{plugins:{legend:{display:false}}});
+ chart('a6','bar',{labels:per.map(x=>x.name.split(' ')[0]),datasets:[{label:'Days worked',data:per.map(x=>x.days),backgroundColor:pal[0]},{label:'Leave days',data:per.map(x=>x.leave),backgroundColor:pal[1]}]})}
+
+function rPen(V){const X=V.pen;if(!X.length){$('p-pen').innerHTML=empty('No penalty records for the selected filters. That is good news.');return}
+ const mo=[...new Set(X.map(x=>x.mi))].sort((a,b)=>a-b),rules=Object.entries(by(X,x=>x.rule||'Other')).sort((a,b)=>b[1].length-a[1].length),ppl=Object.entries(by(X,x=>x.pid)).sort((a,b)=>b[1].length-a[1].length),st=by(X,x=>x.st||'OPEN');
+ $('p-pen').innerHTML=`<div class="kpis">${kpi('Records',X.length)}${kpi('Penalty points',fmt(sum(X.map(x=>x.pp))))}${kpi('Staff affected',ppl.length)}${kpi('Deducted',X.filter(x=>x.act=='DEDUCTED').length,'pay deductions')}${kpi('Justified by staff',X.filter(x=>x.st=='JUSTIFY').length,'awaiting review')}</div>
+ <div class="grid">${card('Penalties by month','','n1')}${card('Most common rules broken','','n2')}${card('Penalty points by person','','n3')}${card('Staff response & management action','','n4')}
+ <div class="card w"><h3>Records</h3><p class="s">Newest first</p>${table([{k:'dt',l:'Date'},{k:'name',l:'Staff'},{k:'rule',l:'Rule'},{k:'pp',l:'Points',n:1},{k:'st',l:'Staff response'},{k:'act',l:'Action'}],X.slice().sort((a,b)=>b.d-a.d).map(x=>({...x,dt:x.d.toLocaleDateString('en-GB'),name:D.names[x.pid]||x.pid})),'tb2')}</div></div>`;
+ const pal=PAL();chart('n1','bar',{labels:mo.map(mLabel),datasets:[{label:'Records',data:mo.map(m=>X.filter(x=>x.mi==m).length),backgroundColor:pal[3]}]},{plugins:{legend:{display:false}}});
+ chart('n2','bar',{labels:rules.map(r=>r[0]),datasets:[{label:'Records',data:rules.map(r=>r[1].length),backgroundColor:pal[1]}]},{indexAxis:'y',plugins:{legend:{display:false}}});
+ chart('n3','bar',{labels:ppl.map(r=>D.names[r[0]]||r[0]),datasets:[{label:'Points',data:ppl.map(r=>sum(r[1].map(x=>x.pp))),backgroundColor:pal[2]}]},{plugins:{legend:{display:false}}});
+ const ac=by(X,x=>x.act);chart('n4','doughnut',{labels:[...Object.keys(st).map(k=>'Staff: '+k.toLowerCase()),...Object.keys(ac).map(k=>'Action: '+k.toLowerCase())],datasets:[{data:[...Object.values(st).map(x=>x.length),...Object.values(ac).map(x=>x.length)],backgroundColor:pal}]})}
+
+function rFb(V){const X=V.fb;if(!X.length){$('p-fb').innerHTML=empty('No feedback responses for the selected filters.');return}
+ const qa=D.qs.map((_,i)=>avg(X.map(x=>x.sc[i]).filter(Boolean))),ppl=Object.entries(by(X,x=>x.label)).map(([l,r])=>({l,v:avg(r.map(x=>x.avg)),n:r.length})).sort((a,b)=>b.v-a.v),roles=by(X,x=>x.role);
+ $('p-fb').innerHTML=`<div class="kpis">${kpi('Responses',X.length)}${kpi('Overall score',fb(avg(X.map(x=>x.avg))))}${kpi('Highest rated',ppl[0].l.split(' ')[0],ppl[0].v.toFixed(2)+' / 5')}${kpi('Needs attention',ppl[ppl.length-1].l.split(' ')[0],ppl[ppl.length-1].v.toFixed(2)+' / 5')}</div>
+ <div class="grid">${card('Average score per person','Out of 5, number of responses shown in tooltip','f1')}${card('Average score per question','Where the team is strongest and weakest','f2')}${card('Who is rating? Officers vs prospective officers','Average per person by rater type','f3','w')}</div>`;
+ const pal=PAL();chart('f1','bar',{labels:ppl.map(x=>x.l.split(' ')[0]),datasets:[{label:'Score',data:ppl.map(x=>r1(x.v*100)/100),backgroundColor:pal[0]}]},{indexAxis:'y',scales:{x:{min:0,max:5,ticks:{color:css('--mute')},grid:{color:css('--line')}},y:{ticks:{color:css('--mute')}}},plugins:{legend:{display:false},tooltip:{callbacks:{afterLabel:c=>ppl[c.dataIndex].n+' responses'}}}});
+ chart('f2','bar',{labels:D.qs.map(q=>q.split(' ').slice(0,3).join(' ')),datasets:[{label:'Score',data:qa.map(v=>r1(v*100)/100),backgroundColor:pal[2]}]},{indexAxis:'y',scales:{x:{min:0,max:5,ticks:{color:css('--mute')},grid:{color:css('--line')}},y:{ticks:{color:css('--mute')}}},plugins:{legend:{display:false}}});
+ chart('f3','bar',{labels:ppl.map(x=>x.l.split(' ')[0]),datasets:Object.entries(roles).map(([r,g],i)=>({label:r,backgroundColor:pal[i],data:ppl.map(p=>{const m=g.filter(x=>x.label==p.l);return m.length?r1(avg(m.map(x=>x.avg))*100)/100:null})}))},{scales:{y:{min:0,max:5,ticks:{color:css('--mute')},grid:{color:css('--line')}},x:{ticks:{color:css('--mute')}}}})}
+
+function scoreRows(V){const A=attStats(V.att),P=by(V.pay,x=>x.pid),pn=by(V.pen,x=>x.pid),f=by(V.fb.filter(x=>x.pid),x=>x.pid);
+ return [...V.ids].filter(p=>D.names[p]).map(p=>{const r=(P[p]||[]).sort((a,b)=>a.mi-b.mi),a=A[p]||{days:0,late:0,home:0,hrs:[]};
+  const o={pid:p,name:D.names[p],role:r.length?r[r.length-1].role:'',kpi:avg(r.map(x=>x.kpi)),tp:sum(r.map(x=>x.tp)),earn:sum(r.map(x=>x.earn)),stage:r.length?r[r.length-1].stage:'',days:a.days,late:a.days?a.late/a.days:0,home:a.days?a.home/a.days:0,leave:a.leave||0,pen:(pn[p]||[]).length,fb:avg((f[p]||[]).map(x=>x.avg))};
+  const risk=(o.stage=='FAIL'?2:0)+(o.late>.3?1:0)+(o.pen>=3?2:o.pen?1:0)+(o.fb&&o.fb<3.5?1:0);o.risk=risk;return o})}
+function rStaff(V){const rows=scoreRows(V);if(!rows.length){$('p-staff').innerHTML=empty();return}
+ $('p-staff').innerHTML=`<div class="card w"><h3>Staff scorecard</h3><p class="s">Everything about each person in one row, using the filters on the left. Risk flags add up: Fail stage (2), penalties (1–2), late starts over 30% (1), feedback under 3.5 (1).</p>
+ <div style="display:flex;gap:8px;margin-bottom:8px"><input id="srch" placeholder="Search name or role" value="${q}" style="max-width:260px"><button class="btn" id="exp">Download CSV</button></div><div id="stw"></div></div>`;
+ $('srch').oninput=e=>{q=e.target.value;stTable(rows)};$('exp').onclick=()=>{const k=['name','role','kpi','tp','earn','stage','days','late','home','leave','pen','fb','risk'];const t=[k.join(','),...rows.map(r=>k.map(c=>JSON.stringify(r[c]??'')).join(','))].join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'text/csv'}));a.download='ncc-staff-scorecard.csv';a.click()};stTable(rows)}
+function stTable(rows){const s=q.toLowerCase(),f=rows.filter(r=>!s||(r.name+r.role).toLowerCase().includes(s)).sort((a,b)=>typeof a[sortKey]=='string'?sortDir*a[sortKey].localeCompare(b[sortKey]):sortDir*(a[sortKey]-b[sortKey]));
+ $('stw').innerHTML=table([{k:'name',l:'Name'},{k:'role',l:'Role'},{k:'stage',l:'Stage',f:stagePill},{k:'kpi',l:'KPI',n:1,f:pct},{k:'tp',l:'TP',n:1,f:fmt},{k:'earn',l:'Earnings',n:1,f:fmt},{k:'days',l:'Days',n:1},{k:'late',l:'Late',n:1,f:pct},{k:'home',l:'Home',n:1,f:pct},{k:'leave',l:'Leave',n:1},{k:'pen',l:'Penalties',n:1},{k:'fb',l:'Feedback',n:1,f:v=>v?v.toFixed(2):'–'},{k:'risk',l:'Risk',n:1,f:v=>`<span class="pill" style="background:${v>=3?'#e4572e':v>=1?'#f2a33a':'#1b998b'}">${v>=3?'High':v>=1?'Watch':'OK'}</span>`}],f,'tb3');bindTable(rows,true)}
+function bindTable(rows,st){const t=document.querySelector('.pane.on table:not(.hm)');if(!t)return;
+ t.querySelectorAll('th').forEach(h=>h.onclick=()=>{const k=h.dataset.k;sortDir=sortKey==k?-sortDir:-1;sortKey=k;if(st)stTable(rows);else render()});
+ t.querySelectorAll('tbody tr').forEach(tr=>tr.onclick=()=>{if(tr.dataset.pid){$('fPid').value=tr.dataset.pid;readF();render()}})}
+load();
+</script>
+</body>
+</html>
